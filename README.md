@@ -1,5 +1,9 @@
 # AlphaBench
 
+> For the no-Docker AlphaBench-EA experiment aligned with the local
+> AlphaMining Ridge/Open-to-Open protocol, see
+> [example/search/ALPHAMINING_ALIGNED_PROTOCOL.md](example/search/ALPHAMINING_ALIGNED_PROTOCOL.md).
+
 **The first systematic benchmark to rigorously evaluate LLMs across the entire formulaic alpha mining workflow.**
 
 AlphaBench assesses how well large language models can generate, evaluate, and refine mathematical expressions (alpha factors) that predict stock returns — covering Chinese A-share markets (CSI300/CSI500/CSI1000) and US markets (SP500).

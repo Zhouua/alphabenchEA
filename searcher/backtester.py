@@ -40,25 +40,33 @@ class Backtester:
         market: str = "csi300",
         start_date: str = "2016-01-01",
         end_date: str = "2021-01-01",
+        label: str = "close_return",
+        forward_n: int = 1,
         top_k: int = 30,
         n_drop: int = 1,
+        account: float = 100_000_000,
+        exchange_kwargs: Optional[Dict[str, Any]] = None,
         fast: bool = True,
         n_jobs: int = 4,
         timeout: int = 120,
         logger=None,
-        label: str = "search",
+        phase: str = "search",
     ):
         self.ffo_url = ffo_url
         self.market = market
         self.start_date = start_date
         self.end_date = end_date
+        self.label = label
+        self.forward_n = forward_n
         self.top_k = top_k
         self.n_drop = n_drop
+        self.account = account
+        self.exchange_kwargs = dict(exchange_kwargs or {})
         self.fast = fast
         self.n_jobs = n_jobs
         self.timeout = timeout
         self.logger = logger
-        self.label = label
+        self.phase = phase
         self._client = FactorEvalClient(base_url=ffo_url, timeout=timeout)
 
     # ------------------------------------------------------------------ #
@@ -79,13 +87,17 @@ class Backtester:
             market=config.market,
             start_date=config.search_start,
             end_date=config.search_end,
+            label=config.label,
+            forward_n=config.forward_n,
             top_k=config.top_k,
             n_drop=config.n_drop,
+            account=config.account,
+            exchange_kwargs=config.get_exchange_kwargs(),
             fast=config.fast,
             n_jobs=config.n_jobs,
             timeout=getattr(config, "timeout", 120),
             logger=logger,
-            label="search",
+            phase="search",
         )
 
     @classmethod
@@ -102,13 +114,17 @@ class Backtester:
             market=backtest_config.market,
             start_date=verification_config.val_start,
             end_date=verification_config.val_end,
+            label=backtest_config.label,
+            forward_n=backtest_config.forward_n,
             top_k=backtest_config.top_k,
             n_drop=backtest_config.n_drop,
+            account=backtest_config.account,
+            exchange_kwargs=backtest_config.get_exchange_kwargs(),
             fast=True,
             n_jobs=backtest_config.n_jobs,
             timeout=getattr(backtest_config, "timeout", 120),
             logger=logger,
-            label="val",
+            phase="val",
         )
 
     @classmethod
@@ -134,13 +150,17 @@ class Backtester:
             market=backtest_config.market,
             start_date=verification_config.test_start,
             end_date=verification_config.test_end,
+            label=backtest_config.label,
+            forward_n=backtest_config.forward_n,
             top_k=top_k,
             n_drop=n_drop,
+            account=backtest_config.account,
+            exchange_kwargs=backtest_config.get_exchange_kwargs(),
             fast=fast,
             n_jobs=n_jobs,
             timeout=getattr(backtest_config, "timeout", 120),
             logger=logger,
-            label="test",
+            phase="test",
         )
 
     # ------------------------------------------------------------------ #
@@ -160,9 +180,13 @@ class Backtester:
                 market=self.market,
                 start_date=self.start_date,
                 end_date=self.end_date,
+                label=self.label,
                 fast=self.fast,
                 topk=self.top_k,
                 n_drop=self.n_drop,
+                account=self.account,
+                forward_n=self.forward_n,
+                exchange_kwargs=self.exchange_kwargs,
                 use_cache=True,
             )
             if isinstance(results, list) and results:
@@ -196,6 +220,43 @@ class Backtester:
         """
         if not factors:
             return []
+
+        # FFO has a dedicated fast batch path that loads the Qlib panel once.
+        # Using one request is substantially faster and more memory-efficient than
+        # N concurrent requests over the decade-long training segment.
+        if self.fast:
+            try:
+                raw_results = self._client.evaluate_factor(
+                    expression=factors,
+                    market=self.market,
+                    start_date=self.start_date,
+                    end_date=self.end_date,
+                    label=self.label,
+                    fast=True,
+                    topk=self.top_k,
+                    n_drop=self.n_drop,
+                    account=self.account,
+                    forward_n=self.forward_n,
+                    exchange_kwargs=self.exchange_kwargs,
+                    timeout=self.timeout,
+                    use_cache=True,
+                )
+                normalized = []
+                for factor, raw in zip(factors, raw_results):
+                    normalized.append(
+                        {
+                            "success": bool(raw.get("success", False)),
+                            "expression": factor.get("expression", ""),
+                            "name": factor.get("name", ""),
+                            "metrics": raw.get("metrics", {}),
+                            "error": raw.get("error"),
+                            "cached": raw.get("cached", False),
+                        }
+                    )
+                if len(normalized) == len(factors):
+                    return normalized
+            except Exception as exc:
+                self._log_warning(f"fast batch evaluation failed; falling back: {exc}")
 
         results: List[Optional[Dict]] = [None] * len(factors)
 
@@ -269,7 +330,7 @@ class Backtester:
     def __repr__(self) -> str:
         return (
             f"Backtester(url={self.ffo_url}, market={self.market}, "
-            f"{self.start_date}~{self.end_date}, fast={self.fast}, label={self.label})"
+            f"{self.start_date}~{self.end_date}, fast={self.fast}, phase={self.phase})"
         )
 
     # ------------------------------------------------------------------ #

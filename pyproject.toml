@@ -34,6 +34,15 @@ dev = [
     "black>=23.0",
     "mypy>=1.0",
 ]
+research = [
+    "pyqlib",
+    "numpy",
+    "pandas",
+    "scipy",
+    "scikit-learn",
+    "zss",
+    "openai",
+]
 
 [project.scripts]
 ppo = "ffo.cli.main:cli"

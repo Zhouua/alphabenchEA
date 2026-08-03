@@ -59,6 +59,7 @@ from .backtester import Backtester
 from .config.config import FullConfig
 from .algo import create_algo
 from .utils.logger import SearchLogger
+from .factor_library import export_factor_library
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +157,7 @@ def cold_start_generate(config: FullConfig, logger) -> List[Dict[str, str]]:
         "Cover different ideas: momentum, mean reversion, volatility, "
         "volume dynamics, cross-variable relations. "
         "Each factor should be a valid Qlib expression using only: "
-        "$close, $open, $high, $low, $volume."
+        "$close, $open, $high, $low, $volume, $vwap."
     )
 
     result = call_qlib_search(
@@ -480,6 +481,10 @@ class SearchPipeline:
 
         # ── Step 5: Save results ────────────────────────────────────────
         self._save_results(algo_result)
+        library_paths = {}
+        if self.config.export.enabled:
+            library_paths = export_factor_library(final_pool, self.config, self.save_dir)
+            self.logger.info(f"Factor library exported to: {library_paths['registry']}")
 
         # ── Step 6: Mining summary ───────────────────────────────────────
         if hasattr(self.logger, "mining_summary"):
@@ -513,6 +518,7 @@ class SearchPipeline:
                 "best_ic":      best.get("metrics", {}).get("ic", 0.0),
                 "elapsed_sec":  elapsed,
             },
+            "factor_library": library_paths,
         }
 
     # ------------------------------------------------------------------ #
@@ -601,6 +607,8 @@ class SearchPipeline:
         algo_params.setdefault("model", model_cfg.name)
         algo_params.setdefault("temperature", model_cfg.temperature)
         algo_params.setdefault("accept_threshold", self.config.backtesting.accept_threshold)
+        algo_params.setdefault("target_description", self.config.backtesting.target_expression)
+        algo_params.setdefault("fields", self.config.backtesting.fields)
 
         # Build evaluate callables — wrap with val tracker if enabled
         evaluate_fn = self.search_backtester.as_evaluate_fn()
@@ -681,8 +689,18 @@ class SearchPipeline:
                 "benchmark": self.config.backtesting.benchmark,
                 "search_start": self.config.backtesting.search_start,
                 "search_end": self.config.backtesting.search_end,
+                "fields": self.config.backtesting.fields,
+                "label": self.config.backtesting.label,
+                "target_expression": self.config.backtesting.target_expression,
+                "forward_n": self.config.backtesting.forward_n,
                 "top_k": self.config.backtesting.top_k,
                 "n_drop": self.config.backtesting.n_drop,
+                "account": self.config.backtesting.account,
+                "deal_price": self.config.backtesting.deal_price,
+                "open_cost": self.config.backtesting.open_cost,
+                "close_cost": self.config.backtesting.close_cost,
+                "min_cost": self.config.backtesting.min_cost,
+                "limit_threshold": self.config.backtesting.limit_threshold,
                 "fast": self.config.backtesting.fast,
                 "n_jobs": self.config.backtesting.n_jobs,
                 "accept_threshold": self.config.backtesting.accept_threshold,
@@ -697,6 +715,17 @@ class SearchPipeline:
                 "test_start": self.config.verification.test_start,
                 "test_end": self.config.verification.test_end,
                 "verification_forward_n": self.config.verification.verification_forward_n,
+                "test_policy": self.config.verification.test_policy,
+            },
+            "ruler": {
+                "estimator": self.config.ruler.estimator,
+                "alpha": self.config.ruler.alpha,
+                "fit_intercept": self.config.ruler.fit_intercept,
+            },
+            "export": {
+                "enabled": self.config.export.enabled,
+                "directory": self.config.export.directory,
+                "source": self.config.export.source,
             },
         }
         with open(config_path, "w", encoding="utf-8") as f:

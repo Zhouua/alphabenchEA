@@ -45,6 +45,8 @@ def compute_factor_data(
         label = "Ref($close, -2)/Ref($close, -1) - 1"
     elif label == "close_return":
         label = "Ref($close, -1)/$close - 1"
+    elif label == "open_to_open_10d":
+        label = "Ref($open, -11)/Ref($open, -1) - 1"
     elif label == "close":
         label = "Ref($close, -1)"
     else:

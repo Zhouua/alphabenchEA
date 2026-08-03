@@ -32,6 +32,11 @@ import re
 from zss import Node
 import ast
 
+try:
+    from .labels import LABEL_MAP as _LABEL_MAP
+except ImportError:  # backend can import this module as top-level ``utils.utils``
+    from utils.labels import LABEL_MAP as _LABEL_MAP
+
 
 # -----------------------------
 # Config (env-overridable)
@@ -539,7 +544,11 @@ def _child_eval_expr(
     qlib_region = region or DEFAULT_REGION
 
     logging.getLogger("qlib.Initialization").setLevel(logging.WARNING)
-    qlib.init(provider_uri=provider_uri, region=qlib_region)
+    try:
+        from .qlib_custom_ops import CUSTOM_OPS
+    except ImportError:
+        from utils.qlib_custom_ops import CUSTOM_OPS
+    qlib.init(provider_uri=provider_uri, region=qlib_region, custom_ops=CUSTOM_OPS)
 
     # Build label spec(s) depending on forward_n
     _empty_result = {
@@ -559,7 +568,11 @@ def _child_eval_expr(
     if forward_n <= 1:
         # Single label — load directly via QlibDataLoader (avoids dataloader.py
         # re-initialising qlib with CN defaults at module-import time)
-        label_expr = _LABEL_MAP.get(label, _LABEL_MAP["close_return"])
+        label_expr = _LABEL_MAP.get(label)
+        if label_expr is None:
+            raise ValueError(
+                f"Unsupported label: {label}. Supported: {list(_LABEL_MAP.keys())}"
+            )
         cfg = {
             "feature": ([expr], ["api_factor"]),
             "label": ([label_expr], ["LABEL"]),
@@ -740,7 +753,11 @@ def _child_check_expr(
     qlib_region = region or DEFAULT_REGION
 
     logging.getLogger("qlib.Initialization").setLevel(logging.WARNING)
-    qlib.init(provider_uri=provider_uri, region=qlib_region)
+    try:
+        from .qlib_custom_ops import CUSTOM_OPS
+    except ImportError:
+        from utils.qlib_custom_ops import CUSTOM_OPS
+    qlib.init(provider_uri=provider_uri, region=qlib_region, custom_ops=CUSTOM_OPS)
 
     cfg = {"feature": ([expr], ["test_expr"])}
     dl = QlibDataLoader(config=cfg)
@@ -834,7 +851,11 @@ def _child_batch_check(
     qlib_region = region or DEFAULT_REGION
 
     logging.getLogger("qlib.Initialization").setLevel(logging.WARNING)
-    qlib.init(provider_uri=provider_uri, region=qlib_region)
+    try:
+        from .qlib_custom_ops import CUSTOM_OPS
+    except ImportError:
+        from utils.qlib_custom_ops import CUSTOM_OPS
+    qlib.init(provider_uri=provider_uri, region=qlib_region, custom_ops=CUSTOM_OPS)
 
     names = [f["name"] for f in factors]
     fields = [f["expression"] for f in factors]
@@ -897,13 +918,6 @@ def _child_batch_check(
     return {"success": True, "count": len(results), "results": results}
 
 
-_LABEL_MAP = {
-    "close_return": "Ref($close, -1)/$close - 1",
-    "close_return_lag": "Ref($close, -2)/Ref($close, -1) - 1",
-    "close": "Ref($close, -1)",
-}
-
-
 def _build_forward_label_exprs(forward_n: int) -> List[Tuple[str, str]]:
     """
     Build (name, qlib_expr) pairs for n consecutive forward daily returns.
@@ -962,7 +976,11 @@ def _child_batch_eval(
     qlib_region = region or DEFAULT_REGION
 
     logging.getLogger("qlib.Initialization").setLevel(logging.WARNING)
-    qlib.init(provider_uri=provider_uri, region=qlib_region)
+    try:
+        from .qlib_custom_ops import CUSTOM_OPS
+    except ImportError:
+        from utils.qlib_custom_ops import CUSTOM_OPS
+    qlib.init(provider_uri=provider_uri, region=qlib_region, custom_ops=CUSTOM_OPS)
 
     names = [f["name"] for f in factors]
     fields = [f["expression"] for f in factors]
@@ -1187,7 +1205,11 @@ def _child_portfolio_combine(
     qlib_region = region or DEFAULT_REGION
 
     logging.getLogger("qlib.Initialization").setLevel(logging.WARNING)
-    qlib.init(provider_uri=provider_uri, region=qlib_region)
+    try:
+        from .qlib_custom_ops import CUSTOM_OPS
+    except ImportError:
+        from utils.qlib_custom_ops import CUSTOM_OPS
+    qlib.init(provider_uri=provider_uri, region=qlib_region, custom_ops=CUSTOM_OPS)
 
     names = [f["name"] for f in factors]
     fields = [f["expression"] for f in factors]

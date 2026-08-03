@@ -73,7 +73,7 @@ FACTOR_STORE = FactorStore()
 # Legacy KV cache (kept for backward compatibility during migration)
 CACHE = PersistentCache()
 
-# Persistent qlib worker pool (one process per region, eager init at import)
+# Persistent qlib worker pool (created lazily only for full portfolio backtests)
 def _build_worker_pool() -> QlibWorkerPool:
     """Build the worker pool from market configs — called once at import time."""
     cfg = get_config()
@@ -87,10 +87,9 @@ def _build_worker_pool() -> QlibWorkerPool:
     return QlibWorkerPool(region_configs, workers_per_region=workers_per_region)
 
 
-# Only build the Qlib worker pool when the qlib engine is active. With the
-# assay engine, evaluation is delegated over HTTP and Qlib data is not needed,
-# so we avoid spinning up (and depending on) the worker processes.
-WORKER_POOL = _build_worker_pool() if ENGINE != "assay" else None
+# EA search uses the fast IC path and does not need persistent portfolio workers.
+# Starting them at import time multiplied memory use by the gunicorn worker count.
+WORKER_POOL = None
 
 
 def _get_worker_pool() -> QlibWorkerPool:
@@ -496,6 +495,7 @@ def eval_once():
         timeout = int(data.get("timeout", DEFAULTS["timeout_eval"]))
         topk = int(data.get("topk", 50))
         n_drop = int(data.get("n_drop", 5))
+        account = float(data.get("account", 100_000_000))
         forward_n = max(1, int(data.get("forward_n", 1)))
 
         # Cache key includes forward_n so forward-n results don't collide with n=1
@@ -523,7 +523,7 @@ def eval_once():
         # US: limit_threshold=None (no daily limit), lower costs without stamp duty.
         exchange_kwargs = {
             "freq": "day",
-            "deal_price": "close",
+            "deal_price": mcfg.get("deal_price", "close"),
             "limit_threshold": mcfg.get("limit_threshold", 0.095 if region == "cn" else None),
             "open_cost": mcfg.get("open_cost", 0.0005 if region == "cn" else 0.0001),
             "close_cost": mcfg.get("close_cost", 0.0015 if region == "cn" else 0.0001),
@@ -533,10 +533,12 @@ def eval_once():
         # Apply optional frontend overrides for exchange kwargs
         ek_overrides = data.get("exchange_kwargs")
         if isinstance(ek_overrides, dict):
-            for key in ("open_cost", "close_cost", "min_cost", "limit_threshold"):
+            for key in ("deal_price", "open_cost", "close_cost", "min_cost", "limit_threshold"):
                 if key in ek_overrides:
                     val = ek_overrides[key]
-                    exchange_kwargs[key] = float(val) if val is not None else None
+                    exchange_kwargs[key] = (
+                        str(val) if key == "deal_price" else (float(val) if val is not None else None)
+                    )
 
         logger.info(
             "Evaluating %d expr(s) (market=%s, %s→%s, label=%s, fast=%s)",
@@ -712,6 +714,7 @@ def eval_once():
                         topk=topk, n_drop=n_drop,
                         start_time=start, end_time=end,
                         data_path=data_path, region=region, BENCH=benchmark,
+                        account=account,
                         exchange_kwargs=exchange_kwargs,
                     ),
                 )
@@ -727,6 +730,7 @@ def eval_once():
                         start_time=start, end_time=end,
                         data_path=data_path, instruments=instruments,
                         region=region, BENCH=benchmark,
+                        account=account,
                         exchange_kwargs=exchange_kwargs,
                     ),
                 )
@@ -832,6 +836,7 @@ def portfolio_combine():
         timeout = int(data.get("timeout", DEFAULTS["timeout_batch"]))
         topk = int(data.get("topk", 50))
         n_drop = int(data.get("n_drop", 5))
+        account = float(data.get("account", 100_000_000))
         forward_n = max(1, int(data.get("forward_n", 1)))
         fast = bool(data.get("fast", True))
         n_jobs_backtest = int(data.get("n_jobs_backtest", 4))
@@ -851,7 +856,7 @@ def portfolio_combine():
 
         exchange_kwargs = {
             "freq": "day",
-            "deal_price": "close",
+            "deal_price": mcfg.get("deal_price", "close"),
             "limit_threshold": mcfg.get("limit_threshold", 0.095 if region == "cn" else None),
             "open_cost": mcfg.get("open_cost", 0.0005 if region == "cn" else 0.0001),
             "close_cost": mcfg.get("close_cost", 0.0015 if region == "cn" else 0.0001),
@@ -861,10 +866,12 @@ def portfolio_combine():
         # Apply optional frontend overrides for exchange kwargs
         ek_overrides = data.get("exchange_kwargs")
         if isinstance(ek_overrides, dict):
-            for key in ("open_cost", "close_cost", "min_cost", "limit_threshold"):
+            for key in ("deal_price", "open_cost", "close_cost", "min_cost", "limit_threshold"):
                 if key in ek_overrides:
                     val = ek_overrides[key]
-                    exchange_kwargs[key] = float(val) if val is not None else None
+                    exchange_kwargs[key] = (
+                        str(val) if key == "deal_price" else (float(val) if val is not None else None)
+                    )
 
         # Build factor defs and combined hash
         import hashlib
@@ -939,6 +946,7 @@ def portfolio_combine():
                             start_time=start, end_time=end,
                             data_path=data_path, region=region,
                             BENCH=benchmark,
+                            account=account,
                             exchange_kwargs=exchange_kwargs,
                         ),
                     )

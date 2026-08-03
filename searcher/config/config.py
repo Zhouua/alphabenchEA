@@ -45,7 +45,7 @@ savedir: "./results"
 
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -126,8 +126,20 @@ class BacktestConfig:
     benchmark: str = "SH000300"
     search_start: str = "2016-01-01"
     search_end: str = "2021-01-01"
+    fields: List[str] = field(
+        default_factory=lambda: ["open", "high", "low", "close", "volume", "vwap"]
+    )
+    label: str = "close_return"
+    target_expression: str = "Ref($close, -1)/$close - 1"
+    forward_n: int = 1
     top_k: int = 30
     n_drop: int = 1
+    account: float = 100_000_000.0
+    deal_price: str = "close"
+    open_cost: float = 0.0005
+    close_cost: float = 0.0015
+    min_cost: float = 5.0
+    limit_threshold: Optional[float] = 0.095
     fast: bool = True
     n_jobs: int = 4
     timeout: int = 120
@@ -139,6 +151,34 @@ class BacktestConfig:
         if not server.startswith("http"):
             server = f"http://{server}"
         return server
+
+    def get_exchange_kwargs(self) -> Dict[str, Any]:
+        """Return the Qlib exchange settings used by full portfolio backtests."""
+        return {
+            "deal_price": self.deal_price,
+            "open_cost": self.open_cost,
+            "close_cost": self.close_cost,
+            "min_cost": self.min_cost,
+            "limit_threshold": self.limit_threshold,
+        }
+
+
+@dataclass
+class RulerConfig:
+    """Fixed Qlib model used to compare complete factor libraries."""
+
+    estimator: str = "ridge"
+    alpha: float = 10.0
+    fit_intercept: bool = False
+
+
+@dataclass
+class ExportConfig:
+    """Factor-library export settings."""
+
+    enabled: bool = False
+    directory: str = "factor_library"
+    source: str = "alphabench_ea"
 
 
 @dataclass
@@ -173,6 +213,7 @@ class VerificationConfig:
     test_start: str = "2022-01-01"
     test_end: str = "2025-01-01"
     verification_forward_n: int = 1
+    test_policy: str = "manual"
 
 
 @dataclass
@@ -202,6 +243,8 @@ class FullConfig:
     searching: SearchingConfig = field(default_factory=SearchingConfig)
     backtesting: BacktestConfig = field(default_factory=BacktestConfig)
     verification: VerificationConfig = field(default_factory=VerificationConfig)
+    ruler: RulerConfig = field(default_factory=RulerConfig)
+    export: ExportConfig = field(default_factory=ExportConfig)
     savedir: str = "./results"
 
 
@@ -263,8 +306,23 @@ def load_config_from_dict(data: Dict[str, Any]) -> FullConfig:
         benchmark=bt_data.get("benchmark", "SH000300"),
         search_start=bt_data.get("search_start", bt_data.get("period_start", "2016-01-01")),
         search_end=bt_data.get("search_end", bt_data.get("period_end", "2021-01-01")),
+        fields=list(bt_data.get("fields", ["open", "high", "low", "close", "volume", "vwap"])),
+        label=bt_data.get("label", "close_return"),
+        target_expression=bt_data.get(
+            "target_expression", "Ref($close, -1)/$close - 1"
+        ),
+        forward_n=int(bt_data.get("forward_n", 1)),
         top_k=int(bt_data.get("top_k", 30)),
         n_drop=int(bt_data.get("n_drop", 1)),
+        account=float(bt_data.get("account", 100_000_000)),
+        deal_price=bt_data.get("deal_price", "close"),
+        open_cost=float(bt_data.get("open_cost", 0.0005)),
+        close_cost=float(bt_data.get("close_cost", 0.0015)),
+        min_cost=float(bt_data.get("min_cost", 5)),
+        limit_threshold=(
+            None if bt_data.get("limit_threshold", 0.095) is None
+            else float(bt_data.get("limit_threshold", 0.095))
+        ),
         fast=bool(bt_data.get("fast", True)),
         n_jobs=int(bt_data.get("n_jobs", 4)),
         timeout=int(bt_data.get("timeout", 120)),
@@ -283,6 +341,21 @@ def load_config_from_dict(data: Dict[str, Any]) -> FullConfig:
         test_start=ver_data.get("test_start", "2022-01-01"),
         test_end=ver_data.get("test_end", "2025-01-01"),
         verification_forward_n=int(ver_data.get("verification_forward_n", 1)),
+        test_policy=ver_data.get("test_policy", "manual"),
+    )
+
+    ruler_data = data.get("ruler", {})
+    ruler_config = RulerConfig(
+        estimator=str(ruler_data.get("estimator", "ridge")),
+        alpha=float(ruler_data.get("alpha", 10.0)),
+        fit_intercept=bool(ruler_data.get("fit_intercept", False)),
+    )
+
+    export_data = data.get("export", {})
+    export_config = ExportConfig(
+        enabled=bool(export_data.get("enabled", False)),
+        directory=str(export_data.get("directory", "factor_library")),
+        source=str(export_data.get("source", "alphabench_ea")),
     )
 
     savedir = data.get("savedir", "./results")
@@ -291,5 +364,7 @@ def load_config_from_dict(data: Dict[str, Any]) -> FullConfig:
         searching=searching_config,
         backtesting=backtest_config,
         verification=verification_config,
+        ruler=ruler_config,
+        export=export_config,
         savedir=savedir,
     )

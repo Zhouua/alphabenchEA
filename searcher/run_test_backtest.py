@@ -106,6 +106,10 @@ def main() -> int:
         choices=["rank_ic", "ic", "icir", "rank_icir"],
         help="Metric to rank factors by for top-N selection (default: rank_ic)"
     )
+    parser.add_argument(
+        "--public-test", action="store_true",
+        help="explicitly authorize held-out test access when test_policy=public_only",
+    )
 
     args = parser.parse_args()
 
@@ -143,6 +147,12 @@ def main() -> int:
 
         # ── Load config and pool ─────────────────────────────────────────
         config = load_config_from_yaml(config_path)
+        if config.verification.test_policy == "public_only" and not args.public_test:
+            logger.error(
+                "Test is held out by policy. Use compare_factor_libraries.py "
+                "--segment test --public-test for the fixed-Ridge public evaluation."
+            )
+            return 2
         logger.info(f"Config: {config_path}")
 
         factors = load_final_pool(pool_path)

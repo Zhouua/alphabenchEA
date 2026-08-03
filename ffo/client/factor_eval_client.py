@@ -262,6 +262,7 @@ class FactorEvalClient:
         n_jobs_backtest: int = 4,
         forward_n: int = 1,
         exchange_kwargs: dict = None,
+        account: float = 100_000_000,
     ) -> List[Dict]:
         """
         POST /factors/eval
@@ -280,6 +281,7 @@ class FactorEvalClient:
             "fast": bool(fast),
             "n_jobs_backtest": int(n_jobs_backtest),
             "forward_n": int(forward_n),
+            "account": float(account),
         }
         if exchange_kwargs:
             payload["exchange_kwargs"] = exchange_kwargs

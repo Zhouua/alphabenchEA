@@ -112,6 +112,8 @@ class EA_Searcher:
         save_dir: str = "./runs/ea_search",
         seeds_top_k: int = 12,
         accept_threshold: float = 0.0,
+        target_description: str = "future return",
+        fields: Optional[List[str]] = None,
         logger=None,
     ) -> None:
         self.batch_evaluate_fn = batch_evaluate_fn
@@ -124,6 +126,8 @@ class EA_Searcher:
         self.save_dir = save_dir
         self.seeds_top_k = int(seeds_top_k)
         self.accept_threshold = float(accept_threshold)
+        self.target_description = target_description
+        self.fields = list(fields or ["open", "high", "low", "close", "volume", "vwap"])
         self.logger = logger
         os.makedirs(self.save_dir, exist_ok=True)
         self.save_log_dir = os.path.join(self.save_dir, "logs")
@@ -385,10 +389,11 @@ class EA_Searcher:
     # ------------------------------------------------------------------ #
 
     def _compose_mutation_prompt(self, seed_block: str, n: int, round_id: int) -> str:
+        field_list = ", ".join(f"${name}" for name in self.fields)
         return f"""You are a quantitative researcher. Your task is to **mutate** existing alpha factors.
 
 Round: {round_id}
-Goal: Propose **exactly {n}** mutated candidates that are likely to improve the information coefficient (IC) while remaining valid Qlib-style expressions.
+Goal: Propose **exactly {n}** mutated candidates that are likely to improve the information coefficient (IC) for target `{self.target_description}` while remaining valid Qlib-style expressions.
 
 Seed factors (JSON; each item has "name", "expression", "metrics"):
 {seed_block}
@@ -398,7 +403,7 @@ What to do (Mutation):
 - Replace or insert nearby operators while preserving the core signal type (momentum / mean-reversion / volatility / liquidity).
 - Normalize signals to reduce scale effects (e.g., divide by rolling Std or use Rank).
 - Add light regularization tricks (e.g., small epsilon in denom, clipping via Min/Max) to improve numerical stability.
-- Keep expressions parsable and balanced (all parentheses closed), and variables limited to: $close, $open, $high, $low, $volume.
+- Keep expressions parsable and balanced (all parentheses closed), and variables limited to: {field_list}.
 - Do NOT invent new variables or unsupported ops.
 - Try to use more diverse operators and window sizes than the seeds, don't only adjust parameters.
 
@@ -418,10 +423,12 @@ No extra text. Output ONLY the JSON array.
 """
 
     def _compose_crossover_prompt(self, seed_block: str, n: int, round_id: int) -> str:
+        field_list = ", ".join(f"${name}" for name in self.fields)
         return f"""You are a quantitative researcher. Your task is to **crossover** existing alpha factors.
 
 Round: {round_id}
-Goal: Propose **exactly {n}** crossover candidates by combining complementary parts of the seed expressions to improve robustness and IC.
+Goal: Propose **exactly {n}** crossover candidates by combining complementary parts of the seed expressions to improve robustness and IC for target `{self.target_description}`.
+Allowed variables: {field_list}.
 
 Seed factors (JSON; each item has "name", "expression", "metrics"):
 {seed_block}
@@ -537,6 +544,8 @@ class EAAlgo(BaseAlgo):
         temperature       = float(self.config.get("temperature", 1.0))
         enable_reason     = bool(self.config.get("enable_reason", True))
         accept_threshold  = float(self.config.get("accept_threshold", 0.0))
+        target_description = str(self.config.get("target_description", "future return"))
+        fields = list(self.config.get("fields", ["open", "high", "low", "close", "volume", "vwap"]))
 
         searcher = EA_Searcher(
             batch_evaluate_fn=self.batch_evaluate_fn,
@@ -547,6 +556,8 @@ class EAAlgo(BaseAlgo):
             save_dir=save_dir,
             seeds_top_k=seeds_top_k,
             accept_threshold=accept_threshold,
+            target_description=target_description,
+            fields=fields,
             logger=self.logger,
         )
 

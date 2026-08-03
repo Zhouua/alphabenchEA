@@ -30,7 +30,11 @@ def _ensure_qlib_init(data_path: str, region: str):
     resolved = str(Path(data_path).expanduser().resolve())
     if _current_provider_uri == resolved:
         return  # already initialized with same provider
-    qlib.init(provider_uri=data_path, region=region)
+    try:
+        from ...utils.qlib_custom_ops import CUSTOM_OPS
+    except ImportError:
+        from utils.qlib_custom_ops import CUSTOM_OPS
+    qlib.init(provider_uri=data_path, region=region, custom_ops=CUSTOM_OPS)
     _current_provider_uri = resolved
 
 
@@ -65,6 +69,7 @@ def backtest_by_scores(
     data_path="~/.qlib/qlib_data/cn_data",
     region="cn",
     BENCH="SH000300",
+    account=100_000_000,
     exchange_kwargs=None,
 ):
 
@@ -74,6 +79,7 @@ def backtest_by_scores(
     strategy_obj = TopkDropoutStrategy(**STRATEGY_CONFIG)
     report_normal, positions_normal = backtest_daily(
         start_time=start_time, end_time=end_time, strategy=strategy_obj, benchmark=BENCH,
+        account=account,
         exchange_kwargs=exchange_kwargs,
     )
 
@@ -92,6 +98,7 @@ def backtest_by_single_alpha(
     instruments="csi300",
     region="cn",
     BENCH="SH000300",
+    account=100_000_000,
     exchange_kwargs=None,
 ):
     """
@@ -163,6 +170,7 @@ def backtest_by_single_alpha(
     strategy_obj = TopkDropoutStrategy(**STRATEGY_CONFIG)
     report_normal, positions_normal = backtest_daily(
         start_time=start_time, end_time=end_time, strategy=strategy_obj, benchmark=BENCH,
+        account=account,
         exchange_kwargs=exchange_kwargs,
     )
 
@@ -226,7 +234,11 @@ if __name__ == "__main__":
     start_time = "2020-01-01"
     end_time = "2022-12-31"
 
-    qlib.init(provider_uri=data_path, region=region)
+    try:
+        from ...utils.qlib_custom_ops import CUSTOM_OPS
+    except ImportError:
+        from utils.qlib_custom_ops import CUSTOM_OPS
+    qlib.init(provider_uri=data_path, region=region, custom_ops=CUSTOM_OPS)
     # data_loader = Alpha158DL()
 
     # df = data_loader.load(

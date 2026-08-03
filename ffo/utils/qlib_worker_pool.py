@@ -52,6 +52,10 @@ def _worker_loop(
     Sends results (or errors) back via result_queue keyed by job_id.
     """
     import qlib
+    try:
+        from .qlib_custom_ops import CUSTOM_OPS
+    except ImportError:
+        from utils.qlib_custom_ops import CUSTOM_OPS
     from backtest.qlib.single_alpha_backtest import (
         backtest_by_scores,
         backtest_by_single_alpha,
@@ -59,7 +63,7 @@ def _worker_loop(
 
     tag = f"{region}#{worker_idx}"
     try:
-        qlib.init(provider_uri=data_path, region=region)
+        qlib.init(provider_uri=data_path, region=region, custom_ops=CUSTOM_OPS)
         logger.info("Worker [%s] initialised (data_path=%s)", tag, data_path)
     except Exception:
         logger.exception("Worker [%s] failed to init qlib", tag)
