@@ -30,17 +30,6 @@ _DEFAULTS: dict[str, Any] = {
             "debug": False,
             "log_level": "INFO",
         },
-        "web": {
-            "host": "0.0.0.0",
-            "port": 19787,
-            "debug": False,
-            "log_level": "INFO",
-        },
-        "mcp": {
-            "host": "0.0.0.0",
-            "port": 8765,
-            "transport": "stdio",
-        },
     },
     "evaluation": {
         "market": "csi300",
@@ -60,17 +49,6 @@ _DEFAULTS: dict[str, Any] = {
         "path": "~/.ppo/factor_cache.sqlite",
         "max_entries": 50000,
     },
-    # Evaluation engine selection. "qlib" uses the in-process Qlib worker pool
-    # (default). "assay" delegates factor evaluation to the Assay backtesting
-    # platform's REST API (reached over HTTP, since Assay runs on its own
-    # Python interpreter). See ffo/utils/assay_engine.py.
-    "engine": {
-        "backend": "qlib",                    # "qlib" | "assay"
-        "assay_url": "http://127.0.0.1:8000",
-        "assay_timeout": 180,
-        "assay_execution": None,              # optional Assay fill model (e.g. "close")
-        "assay_adj": None,                    # optional Assay price adjustment (e.g. "split")
-    },
     "qlib": {
         "data_path": "~/.qlib/qlib_data/cn_data",
         "region": "cn",
@@ -81,7 +59,6 @@ _DEFAULTS: dict[str, Any] = {
             "data_path": "~/.qlib/qlib_data/cn_data",
             "region": "cn",
             "benchmark": "SH000300",
-            "assay_universe": "CSI300",
             "limit_threshold": 0.095,
             "open_cost": 0.0005,
             "close_cost": 0.0015,
@@ -91,17 +68,6 @@ _DEFAULTS: dict[str, Any] = {
             "data_path": "~/.qlib/qlib_data/cn_data",
             "region": "cn",
             "benchmark": "SH000905",
-            "assay_universe": "CSI500",
-            "limit_threshold": 0.095,
-            "open_cost": 0.0005,
-            "close_cost": 0.0015,
-            "min_cost": 5,
-        },
-        "csi1000": {
-            "data_path": "~/.qlib/qlib_data/cn_data",
-            "region": "cn",
-            "benchmark": "SH000852",
-            "assay_universe": "CSI1000",
             "limit_threshold": 0.095,
             "open_cost": 0.0005,
             "close_cost": 0.0015,
@@ -111,18 +77,7 @@ _DEFAULTS: dict[str, Any] = {
             "data_path": "~/.qlib/qlib_data/us_data_ours",
             "region": "us",
             "benchmark": "^gspc",
-            "assay_universe": "SP500",
             "limit_threshold": None,   # no daily price limit in US
-            "open_cost": 0.0001,
-            "close_cost": 0.0001,
-            "min_cost": 0,
-        },
-        "nasdaq100": {
-            "data_path": "~/.qlib/qlib_data/us_data_ours",
-            "region": "us",
-            "benchmark": "^ixic",
-            "assay_universe": "NASDAQ100",
-            "limit_threshold": None,
             "open_cost": 0.0001,
             "close_cost": 0.0001,
             "min_cost": 0,
@@ -178,13 +133,6 @@ def _apply_env_overrides(cfg: dict) -> dict:
         ("FFO_BACKEND_THREADS", ["server", "backend", "threads"]),
         ("FFO_BACKEND_TIMEOUT", ["server", "backend", "timeout"]),
         ("FFO_BACKEND_DEBUG",   ["server", "backend", "debug"]),
-        # server.web
-        ("FFO_WEB_HOST",  ["server", "web", "host"]),
-        ("FFO_WEB_PORT",  ["server", "web", "port"]),
-        ("FFO_WEB_DEBUG", ["server", "web", "debug"]),
-        # server.mcp
-        ("FFO_MCP_PORT",      ["server", "mcp", "port"]),
-        ("FFO_MCP_TRANSPORT", ["server", "mcp", "transport"]),
         # evaluation
         ("FFO_MARKET",          ["evaluation", "market"]),
         ("FFO_START",           ["evaluation", "start"]),
@@ -198,12 +146,6 @@ def _apply_env_overrides(cfg: dict) -> dict:
         # cache
         ("FFO_CACHE_PATH",        ["cache", "path"]),
         ("FFO_CACHE_MAX_ENTRIES", ["cache", "max_entries"]),
-        # engine (qlib vs assay backend selection)
-        ("FFO_ENGINE",          ["engine", "backend"]),
-        ("FFO_ASSAY_URL",       ["engine", "assay_url"]),
-        ("FFO_ASSAY_TIMEOUT",   ["engine", "assay_timeout"]),
-        ("FFO_ASSAY_EXECUTION", ["engine", "assay_execution"]),
-        ("FFO_ASSAY_ADJ",       ["engine", "assay_adj"]),
         # qlib
         ("FFO_QLIB_DATA_PATH", ["qlib", "data_path"]),
         ("FFO_QLIB_REGION",    ["qlib", "region"]),

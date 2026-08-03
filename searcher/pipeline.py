@@ -9,7 +9,7 @@ Pipeline flow
 
 2. Run an initial backtest of the seed pool via FFO to collect baseline metrics.
 
-3. Call the configured search algorithm (CoT / EA / ToT) which internally
+3. Run the configured EA mutation/crossover search, which internally
    evaluates every new candidate through the same FFO Backtester.
    If verification is enabled, each evaluated factor is also evaluated on
    the validation period (val metrics are saved but NOT used for search

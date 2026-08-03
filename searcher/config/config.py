@@ -5,7 +5,7 @@ YAML format (search_config.yaml)
 ─────────────────────────────────
 searching:
   algo:
-    name: ea          # "ea" | "cot" | "tot"
+    name: ea
     param:
       rounds: 10
       N: 30
@@ -56,7 +56,7 @@ class AlgoConfig:
     Algorithm selection and parameters.
 
     Attributes:
-        name:       Algorithm name — "ea", "cot", or "tot".
+        name:       Algorithm name — "ea".
         param:      Algorithm-specific parameter dict (forwarded verbatim to the algo).
         seed_file:  Optional path to a seed factor file (warm start).
         seed_top_k: Max seeds to pass to LLM context per round (for controller-based algos).

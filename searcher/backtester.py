@@ -30,7 +30,7 @@ class Backtester:
     Wraps FactorEvalClient with:
       - Bound market / date / portfolio params from config
       - Normalised return dicts: {"success", "expression", "metrics", "name"}
-      - Two batch interfaces: list (for EA) and dict-by-name (for ToT)
+      - List and name-keyed batch interfaces for EA evaluation
       - Parallel evaluation support
     """
 
@@ -299,7 +299,7 @@ class Backtester:
     # ------------------------------------------------------------------ #
 
     def as_evaluate_fn(self) -> Callable:
-        """Return evaluate_single as a plain callable (for CoT, ToT single eval)."""
+        """Return evaluate_single as a plain callable."""
         return self.evaluate_single
 
     def as_batch_evaluate_fn(self) -> Callable:
@@ -307,7 +307,7 @@ class Backtester:
         return self.evaluate_batch
 
     def as_batch_evaluate_fn_dict(self) -> Callable:
-        """Return evaluate_batch_by_name as a callable returning Dict[str, Dict] (for ToT)."""
+        """Return evaluate_batch_by_name as a callable returning Dict[str, Dict]."""
         return self.evaluate_batch_by_name
 
     # ------------------------------------------------------------------ #

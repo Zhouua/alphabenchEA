@@ -17,21 +17,15 @@ from datetime import datetime, timezone
 from urllib.parse import unquote
 
 from flask import Flask, request, jsonify
-from flask_cors import CORS
 from utils.utils import PersistentCache
-from utils.assay_engine import engine_name, is_assay, health as assay_health
 
 # Load routes
-from routes.combinations import bp as combinations_bp
 from routes.factors import bp as factors_bp
 
 # -----------------------------
 # App / Logging
 # -----------------------------
 app = Flask(__name__)
-CORS(app)
-
-app.register_blueprint(combinations_bp)
 app.register_blueprint(factors_bp)
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
@@ -89,15 +83,10 @@ def health():
     info = {
         "status": "healthy",
         "service": "Factor Evaluation API",
-        "engine": engine_name(),
+        "engine": "qlib",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "cache": CACHE.stats(),
     }
-    # When running on the Assay engine, surface its reachability so callers
-    # can tell whether the delegated backend is actually up.
-    if is_assay():
-        ok, assay_info = assay_health()
-        info["assay"] = {"reachable": ok, **({"status": assay_info} if ok else {"error": assay_info})}
     return jsonify(info)
 
 
