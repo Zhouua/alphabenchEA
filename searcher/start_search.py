@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-AlphaBench Factor Search — Main Entry Point
+AlphaBench-EA Factor Search — Main Entry Point
 
 Runs the full factor discovery pipeline:
   1. Cold / warm / resume start to build initial seed pool
   2. Baseline evaluation of seeds via FFO server
-  3. Search algorithm (CoT / EA / ToT) iterates, evaluating every candidate via FFO
+  3. EA mutation/crossover search iterates, evaluating every candidate via FFO
   4. Results (best factor + final pool) are saved to disk
 
 Usage
 ─────
   # Cold start (LLM generates initial factors):
-  python start_search.py --config search_config.yaml
+  python searcher/start_search.py --config example/search/configs/alphabench_ea_alphamining.yaml
 
   # Warm start (load seeds from file):
   python start_search.py --config search_config.yaml --seed-file factors.txt
@@ -26,7 +26,7 @@ YAML config format
 ──────────────────
   searching:
     algo:
-      name: ea           # "ea" | "cot" | "tot"
+      name: ea
       param:
         rounds: 10
         N: 30
@@ -74,25 +74,29 @@ from searcher.utils.logger import SearchLogger
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="AlphaBench Factor Search",
+        description="AlphaBench-EA Factor Search",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Cold start
-  python start_search.py --config search_config.yaml
+  # Aligned CSI300 experiment
+  python searcher/start_search.py --config example/search/configs/alphabench_ea_alphamining.yaml
 
   # Warm start with factor file
-  python start_search.py --config search_config.yaml --seed-file seeds.txt
+  python searcher/start_search.py --seed-file seeds.txt
 
   # Warm start with built-in alpha158
-  python start_search.py --config search_config.yaml --alpha158
+  python searcher/start_search.py --alpha158
 
   # Resume from checkpoint
-  python start_search.py --config search_config.yaml --resume results/final_pool.jsonl
+  python searcher/start_search.py --resume runs/previous/final_pool.jsonl
         """,
     )
-    parser.add_argument("--config", type=str, default="config.yaml",
-                        help="YAML configuration file (default: config.yaml)")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="example/search/configs/alphabench_ea_alphamining.yaml",
+        help="YAML configuration file",
+    )
     parser.add_argument("--seed-file", type=str, default=None,
                         help="Seed factors file (.txt / .json / .jsonl)")
     parser.add_argument("--alpha158", action="store_true",

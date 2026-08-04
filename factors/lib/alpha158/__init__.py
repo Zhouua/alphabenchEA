@@ -1,19 +1,18 @@
-import os
 import json
+from pathlib import Path
 
-FACTOR_DIR = "./factors/lib/alpha158"
-COMPILE_FILE = os.path.join(FACTOR_DIR, "qlib_compile_product.json")
+FACTOR_DIR = Path(__file__).resolve().parent
+COMPILE_FILE = FACTOR_DIR / "qlib_compile_product.json"
 
 
 def load_factors_alpha158_names():
 
     standard_factors = {}
-    for file_name in os.listdir(FACTOR_DIR):
-        if file_name.endswith(".json") and file_name != "qlib_compile_product.json":
-            file_path = os.path.join(FACTOR_DIR, file_name)
+    for file_path in FACTOR_DIR.glob("*.json"):
+        if file_path.name != "qlib_compile_product.json":
             with open(file_path, "r") as f:
                 factors = json.load(f)
-                standard_factors[file_name.split(".")[0]] = factors
+                standard_factors[file_path.stem] = factors
 
     return standard_factors
 
@@ -49,8 +48,8 @@ def load_factors_alpha158(exclude_var=None, collection=None):
     if collection is not None:
         if isinstance(collection, str):
             target_file = f"{collection}.json"
-            file_path = os.path.join(FACTOR_DIR, target_file)
-            if os.path.exists(file_path):
+            file_path = FACTOR_DIR / target_file
+            if file_path.exists():
                 with open(file_path, "r") as f:
                     factors = json.load(f)
                     standard_factors.extend(factors)
@@ -61,8 +60,8 @@ def load_factors_alpha158(exclude_var=None, collection=None):
         elif isinstance(collection, list):
             for coll in collection:
                 target_file = f"{coll}.json"
-                file_path = os.path.join(FACTOR_DIR, target_file)
-                if os.path.exists(file_path):
+                file_path = FACTOR_DIR / target_file
+                if file_path.exists():
                     with open(file_path, "r") as f:
                         factors = json.load(f)
                         standard_factors.extend(factors)
@@ -73,9 +72,8 @@ def load_factors_alpha158(exclude_var=None, collection=None):
         else:
             raise ValueError("Collection must be a string or a list of strings.")
     else:
-        for file_name in os.listdir(FACTOR_DIR):
-            if file_name.endswith(".json") and file_name != "qlib_compile_product.json":
-                file_path = os.path.join(FACTOR_DIR, file_name)
+        for file_path in FACTOR_DIR.glob("*.json"):
+            if file_path.name != "qlib_compile_product.json":
                 with open(file_path, "r") as f:
                     factors = json.load(f)
                     standard_factors.extend(factors)

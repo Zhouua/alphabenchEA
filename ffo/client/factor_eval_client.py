@@ -511,7 +511,7 @@ def batch_evaluate_factors_via_api(
     """Evaluate multiple factor expressions via the FFO API (parallel).
 
     This is a convenience wrapper matching the old ``api.factor_eval_client``
-    interface so that existing searchers (EA / CoT / ToT) keep working.
+    interface used by the EA searcher.
     """
     client = get_client(api_url)
     results = []

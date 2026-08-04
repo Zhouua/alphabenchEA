@@ -1,26 +1,12 @@
-"""
-Algo registry for the searcher platform.
-
-All search algorithms inherit from BaseAlgo and are registered here.
-Use create_algo() to instantiate any algo by name from a config dict.
-
-Supported algorithms:
-  - "cot": Chain-of-Thought single-path refinement
-  - "ea":  Evolutionary Algorithm (mutation + crossover population search)
-  - "tot": Tree-of-Thought parallel-recursive expansion
-"""
+"""Evolutionary factor-search registry used by AlphaBench-EA."""
 
 from .base import BaseAlgo
-from .cot import CoTAlgo, CoTSearcher
 from .ea import EAAlgo, EA_Searcher
-from .tot import ToTAlgo, ToTSearcher
 from typing import Any, Callable, Dict
 
 # Registry maps algo name → class
 _REGISTRY: Dict[str, type] = {
-    "cot": CoTAlgo,
     "ea":  EAAlgo,
-    "tot": ToTAlgo,
 }
 
 
@@ -47,7 +33,7 @@ def create_algo(
     Instantiate a search algorithm by name.
 
     Args:
-        name:                  Algorithm name ("cot", "ea", "tot", or custom).
+        name:                  Algorithm name ("ea" or a custom registration).
         config:                Algorithm-specific params dict (from YAML algo.param).
         evaluate_fn:           fn(expression: str) -> Dict  (single factor eval via FFO).
         batch_evaluate_fn:     fn(factors: List[Dict]) -> List[Dict]  (list result).
@@ -81,12 +67,8 @@ def create_algo(
 
 __all__ = [
     "BaseAlgo",
-    "CoTAlgo",
-    "CoTSearcher",
     "EAAlgo",
     "EA_Searcher",
-    "ToTAlgo",
-    "ToTSearcher",
     "create_algo",
     "register_algo",
     "list_algos",

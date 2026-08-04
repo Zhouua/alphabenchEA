@@ -25,6 +25,7 @@ import pickle
 import sqlite3
 import tempfile
 import threading
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -60,7 +61,9 @@ class FactorStore:
         self.cache_dir = Path(cache_dir)
         self.db_path = self.cache_dir / "factor_perf.sqlite"
         self.scores_dir = self.cache_dir / "factor_scores"
-        self._lock = threading.Lock()
+        # One process may serve several gunicorn threads. Serialize writes and
+        # score-file updates; SQLite WAL still permits concurrent readers.
+        self._lock = threading.RLock()
 
         # Ensure directories exist
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -73,7 +76,7 @@ class FactorStore:
     # ------------------------------------------------------------------ #
 
     def _init_db(self):
-        with self._connect() as conn:
+        with self._lock, self._connection() as conn:
             conn.executescript("""
                 PRAGMA journal_mode = WAL;
                 PRAGMA synchronous = NORMAL;
@@ -105,9 +108,32 @@ class FactorStore:
                 conn.execute("ALTER TABLE daily_ic ADD COLUMN turnover REAL")
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self.db_path), timeout=30)
+        conn = sqlite3.connect(
+            str(self.db_path),
+            timeout=120,
+            check_same_thread=False,
+        )
         conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
+        conn.execute("PRAGMA busy_timeout = 120000")
         return conn
+
+    @contextmanager
+    def _connection(self):
+        """Yield a connection and always commit/rollback and close it.
+
+        ``sqlite3.Connection``'s own context manager does not close the
+        connection, which previously leaked handles under long EA batches.
+        """
+        conn = self._connect()
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     # ------------------------------------------------------------------ #
     #  Expression metadata                                                 #
@@ -115,7 +141,7 @@ class FactorStore:
 
     def register_expression(self, expr_hash: str, expression: str) -> None:
         """Store expression text for a given hash (for admin/debugging)."""
-        with self._connect() as conn:
+        with self._lock, self._connection() as conn:
             conn.execute(
                 "INSERT OR IGNORE INTO expressions (expr_hash, expression) VALUES (?, ?)",
                 (expr_hash, expression),
@@ -132,7 +158,7 @@ class FactorStore:
         Returns (min_date, max_date, count) of cached daily IC entries
         within the requested [start, end] range.
         """
-        with self._connect() as conn:
+        with self._connection() as conn:
             row = conn.execute(
                 """
                 SELECT MIN(date), MAX(date), COUNT(*)
@@ -186,7 +212,7 @@ class FactorStore:
             List of {"date": str, "ic": float, "rank_ic": float, "turnover": float}
             sorted by date.
         """
-        with self._connect() as conn:
+        with self._connection() as conn:
             rows = conn.execute(
                 """
                 SELECT date, ic, rank_ic, turnover
@@ -227,7 +253,7 @@ class FactorStore:
              d.get("turnover"))
             for d in daily_data
         ]
-        with self._connect() as conn:
+        with self._lock, self._connection() as conn:
             conn.executemany(
                 """
                 INSERT OR REPLACE INTO daily_ic
@@ -383,7 +409,7 @@ class FactorStore:
 
     def get_store_stats(self) -> Dict[str, Any]:
         """Return cache statistics."""
-        with self._connect() as conn:
+        with self._connection() as conn:
             n_expr = conn.execute("SELECT COUNT(*) FROM expressions").fetchone()[0]
             n_daily = conn.execute("SELECT COUNT(*) FROM daily_ic").fetchone()[0]
 
@@ -400,7 +426,7 @@ class FactorStore:
 
     def clear(self, expr_hash: Optional[str] = None) -> None:
         """Clear all cache data, or for a specific expression."""
-        with self._connect() as conn:
+        with self._lock, self._connection() as conn:
             if expr_hash:
                 conn.execute("DELETE FROM daily_ic WHERE expr_hash = ?", (expr_hash,))
                 conn.execute("DELETE FROM expressions WHERE expr_hash = ?", (expr_hash,))

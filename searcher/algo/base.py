@@ -20,7 +20,7 @@ class BaseAlgo(ABC):
     - run() accepts an already-evaluated seed pool and returns a summary dict
 
     Attributes:
-        name: Short identifier used in YAML config (e.g. "ea", "cot", "tot")
+        name: Short identifier used in YAML config ("ea")
         evaluate_fn:       fn(expression: str) -> Dict  (single factor eval)
         batch_evaluate_fn: fn(factors: List[Dict]) -> List[Dict]  (list result)
         batch_evaluate_fn_dict: fn(factors: List[Dict]) -> Dict[str, Dict]  (dict by name)

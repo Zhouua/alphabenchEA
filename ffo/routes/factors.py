@@ -18,9 +18,6 @@ from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from flask_cors import CORS
-
-
 from utils.utils import (
     PersistentCache,
     expr_hash,
@@ -36,16 +33,6 @@ from utils.utils import (
 from utils.factor_store import FactorStore
 from utils.qlib_worker_pool import QlibWorkerPool
 from config.manager import get_config
-from utils.assay_engine import (
-    engine_name,
-    assay_eval,
-    assay_check,
-    assay_portfolio_combine,
-)
-
-# Active evaluation engine: "qlib" (native worker pool) or "assay" (Assay REST).
-ENGINE = engine_name()
-
 bp = Blueprint("factors", __name__, url_prefix="/factors")
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
@@ -373,10 +360,6 @@ def check():
             400,
         )
 
-    # Assay engine: delegate syntax checking to Assay's lint endpoint.
-    if ENGINE == "assay":
-        return jsonify(assay_check(factors)), 200
-
     instruments = data.get("instruments", DEFAULT_INSTRUMENTS)
     start = data.get("start", DEFAULTS["check_start"])
     end = data.get("end", DEFAULTS["check_end"])
@@ -503,13 +486,6 @@ def eval_once():
 
         fast = bool(data.get("fast", False))
         n_jobs_backtest = int(data.get("n_jobs_backtest", 4))
-
-        # Assay engine: delegate evaluation to Assay's REST API. Returns the
-        # same FFO result shape (metrics + daily_metrics) for single or batch.
-        if ENGINE == "assay":
-            return jsonify(
-                assay_eval(factors, market, start, end, forward_n=forward_n)
-            ), 200
 
         # Resolve market config (data_path, region, benchmark, trade costs)
         mcfg = get_config().get_market_config(market)
@@ -840,12 +816,6 @@ def portfolio_combine():
         forward_n = max(1, int(data.get("forward_n", 1)))
         fast = bool(data.get("fast", True))
         n_jobs_backtest = int(data.get("n_jobs_backtest", 4))
-
-        # Assay engine: equal-weight z-score combine via Assay's REST API.
-        if ENGINE == "assay":
-            return jsonify(
-                assay_portfolio_combine(factors, market, start, end, forward_n=forward_n)
-            ), 200
 
         # Resolve market config
         mcfg = get_config().get_market_config(market)

@@ -5,9 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ppo"
 version = "0.1.0"
-description = "PPO - Pluggable Portfolio Optimizer: Factor evaluation service with CLI, API, and MCP interface"
-readme = "ffo/README.md"
-requires-python = ">=3.9"
+description = "AlphaBench-EA factor discovery and AlphaMining-aligned evaluation"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
 license = { text = "MIT" }
 
 dependencies = [
@@ -20,11 +20,8 @@ dependencies = [
     "psutil>=5.9",
     # HTTP client
     "requests>=2.28",
-    # MCP server
-    "fastmcp>=2.0",
     # Flask server (backend)
     "flask>=2.3",
-    "flask-cors>=4.0",
     "gunicorn>=21.0",
 ]
 
@@ -42,19 +39,21 @@ research = [
     "scikit-learn",
     "zss",
     "openai",
+    "jsonschema",
+    "tqdm",
+    "matplotlib",
 ]
 
 [project.scripts]
 ppo = "ffo.cli.main:cli"
 
 [tool.setuptools.packages.find]
-# Include ffo package and all sub-packages
-include = ["ffo*"]
+# Install every package needed by the EA pipeline in editable or wheel installs.
+include = ["ffo*", "searcher*", "agent*", "factors*"]
+namespaces = true
 
 [tool.setuptools.package-data]
 ffo = [
     "config/ffo.yaml",
-    "templates/**/*",
-    "examples/**/*",
-    "demos/**/*",
 ]
+"factors.lib.alpha158" = ["*.json"]
