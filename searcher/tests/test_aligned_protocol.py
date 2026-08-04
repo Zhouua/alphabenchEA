@@ -1,6 +1,8 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from ffo.utils.factor_store import FactorStore
 from ffo.utils.labels import LABEL_MAP
 from searcher.config.config import load_config_from_yaml
 from searcher.factor_library import export_factor_library
@@ -16,6 +18,7 @@ def test_aligned_config_is_exact():
     validate_config(config)
     assert LABEL_MAP["open_to_open_10d"] == "Ref($open, -11)/Ref($open, -1) - 1"
     assert config.backtesting.forward_n == 1
+    assert config.backtesting.use_cache is False
     assert config.verification.test_policy == "public_only"
 
 
@@ -54,3 +57,31 @@ def test_factor_library_is_alphamining_compatible_and_test_free(tmp_path):
     assert manifest["ruler"] == {
         "estimator": "ridge", "alpha": 10.0, "fit_intercept": False,
     }
+
+
+def test_factor_store_serializes_concurrent_writes(tmp_path):
+    store = FactorStore(str(tmp_path / "cache"))
+
+    def write_one(index):
+        factor_hash = f"factor-{index}"
+        store.register_expression(factor_hash, f"Mean($close, {index + 2})")
+        store.put_daily_ic(
+            factor_hash,
+            "csi300",
+            "open_to_open_10d",
+            [
+                {
+                    "date": "2020-01-02",
+                    "ic": 0.01,
+                    "rank_ic": 0.02,
+                    "turnover": 0.1,
+                }
+            ],
+        )
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(write_one, range(32)))
+
+    stats = store.get_store_stats()
+    assert stats["expressions"] == 32
+    assert stats["daily_ic_entries"] == 32

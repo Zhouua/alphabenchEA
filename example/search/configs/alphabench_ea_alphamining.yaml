@@ -43,6 +43,9 @@ backtesting:
   fast: true
   n_jobs: 8
   timeout: 900
+  # EA evaluates large train/validation batches once; persistent SQLite
+  # caching adds write contention without benefiting this fixed run.
+  use_cache: false
   accept_threshold: 0.0
 
 verification:

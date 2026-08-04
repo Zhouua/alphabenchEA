@@ -47,6 +47,8 @@ def validate_config(config) -> None:
             raise ValueError(f"{key} mismatch: expected {expected!r}, got {actual[key]!r}")
     if config.backtesting.forward_n != 1:
         raise ValueError("forward_n must be 1; the exact 10-day return is already the label")
+    if config.backtesting.use_cache:
+        raise ValueError("use_cache must be false for contention-free EA batch evaluation")
     if (config.ruler.estimator.lower(), config.ruler.alpha, config.ruler.fit_intercept) != (
         "ridge", 10.0, False,
     ):

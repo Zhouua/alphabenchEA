@@ -49,6 +49,7 @@ class Backtester:
         fast: bool = True,
         n_jobs: int = 4,
         timeout: int = 120,
+        use_cache: bool = True,
         logger=None,
         phase: str = "search",
     ):
@@ -65,6 +66,7 @@ class Backtester:
         self.fast = fast
         self.n_jobs = n_jobs
         self.timeout = timeout
+        self.use_cache = use_cache
         self.logger = logger
         self.phase = phase
         self._client = FactorEvalClient(base_url=ffo_url, timeout=timeout)
@@ -96,6 +98,7 @@ class Backtester:
             fast=config.fast,
             n_jobs=config.n_jobs,
             timeout=getattr(config, "timeout", 120),
+            use_cache=getattr(config, "use_cache", True),
             logger=logger,
             phase="search",
         )
@@ -123,6 +126,7 @@ class Backtester:
             fast=True,
             n_jobs=backtest_config.n_jobs,
             timeout=getattr(backtest_config, "timeout", 120),
+            use_cache=getattr(backtest_config, "use_cache", True),
             logger=logger,
             phase="val",
         )
@@ -159,6 +163,7 @@ class Backtester:
             fast=fast,
             n_jobs=n_jobs,
             timeout=getattr(backtest_config, "timeout", 120),
+            use_cache=getattr(backtest_config, "use_cache", True),
             logger=logger,
             phase="test",
         )
@@ -187,7 +192,7 @@ class Backtester:
                 account=self.account,
                 forward_n=self.forward_n,
                 exchange_kwargs=self.exchange_kwargs,
-                use_cache=True,
+                use_cache=self.use_cache,
             )
             if isinstance(results, list) and results:
                 raw = results[0]
@@ -239,7 +244,7 @@ class Backtester:
                     forward_n=self.forward_n,
                     exchange_kwargs=self.exchange_kwargs,
                     timeout=self.timeout,
-                    use_cache=True,
+                    use_cache=self.use_cache,
                 )
                 normalized = []
                 for factor, raw in zip(factors, raw_results):
@@ -255,8 +260,25 @@ class Backtester:
                     )
                 if len(normalized) == len(factors):
                     return normalized
+                raise RuntimeError(
+                    f"FFO returned {len(normalized)}/{len(factors)} batch results"
+                )
             except Exception as exc:
-                self._log_warning(f"fast batch evaluation failed; falling back: {exc}")
+                # A decade-long batch must not fan out into N concurrent
+                # single requests: that multiplies Qlib memory and SQLite
+                # writers, turning one failure into a lock storm.
+                self._log_warning(f"fast batch evaluation failed: {exc}")
+                return [
+                    {
+                        "success": False,
+                        "expression": factor.get("expression", ""),
+                        "name": factor.get("name", ""),
+                        "metrics": {},
+                        "error": str(exc),
+                        "cached": False,
+                    }
+                    for factor in factors
+                ]
 
         results: List[Optional[Dict]] = [None] * len(factors)
 

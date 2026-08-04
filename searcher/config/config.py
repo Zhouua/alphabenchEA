@@ -115,6 +115,8 @@ class BacktestConfig:
         fast:          Fast mode — compute IC metrics only (True) or full portfolio
                        backtest (False).  Fast mode is ~5-10x quicker.
         n_jobs:        Parallel evaluation workers.
+        use_cache:     Persist FFO metrics in SQLite. Disable for large EA
+                       batches to avoid unnecessary cache-write contention.
         timeout:          Per-factor evaluation timeout in seconds.
         accept_threshold: Minimum RankIC a factor must achieve to be accepted
                           into the search pool.  Use 0.0 to accept all factors
@@ -143,6 +145,7 @@ class BacktestConfig:
     fast: bool = True
     n_jobs: int = 4
     timeout: int = 120
+    use_cache: bool = True
     accept_threshold: float = 0.0
 
     def get_api_url(self) -> str:
@@ -326,6 +329,7 @@ def load_config_from_dict(data: Dict[str, Any]) -> FullConfig:
         fast=bool(bt_data.get("fast", True)),
         n_jobs=int(bt_data.get("n_jobs", 4)),
         timeout=int(bt_data.get("timeout", 120)),
+        use_cache=bool(bt_data.get("use_cache", True)),
         accept_threshold=float(bt_data.get("accept_threshold", 0.0)),
     )
 

@@ -703,6 +703,7 @@ class SearchPipeline:
                 "limit_threshold": self.config.backtesting.limit_threshold,
                 "fast": self.config.backtesting.fast,
                 "n_jobs": self.config.backtesting.n_jobs,
+                "use_cache": self.config.backtesting.use_cache,
                 "accept_threshold": self.config.backtesting.accept_threshold,
             },
             "verification": {
