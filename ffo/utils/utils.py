@@ -34,8 +34,10 @@ import ast
 
 try:
     from .labels import LABEL_MAP as _LABEL_MAP
+    from .request_parsing import normalize_factors_from_expression_field
 except ImportError:  # backend can import this module as top-level ``utils.utils``
     from utils.labels import LABEL_MAP as _LABEL_MAP
+    from utils.request_parsing import normalize_factors_from_expression_field
 
 
 # -----------------------------
@@ -1521,99 +1523,4 @@ def run_portfolio_combine_with_timeout(
         (factors, instruments, start, end, label_spec, scores_save_dir,
          combined_hash, data_path, region, forward_n),
         timeout,
-    )
-
-
-def normalize_factors_from_expression_field(data: dict):
-    """
-    Normalize request data into a list of factors:
-    Returns: List[{"name": str, "expression": str}]
-
-    Supported "expression":
-      - "xxx"                                   (single, no name)
-      - {"n1": "e1", "n2": "e2"}                (one or many, with name)
-      - ["e1", "e2", ...]                       (many, no name)
-      - (optional) mixed list: ["e1", {"n2":"e2"}]
-    """
-    expr_field = data.get("expression", None)
-    if expr_field is None:
-        expr_field = data.get("expr", None)  # optional legacy alias
-
-    if expr_field is None:
-        return None, ("Missing 'expression'", "EMPTY_EXPR")
-
-    def _push(name: str, expr: str):
-        expr = (expr or "").strip()
-        if not expr:
-            raise ValueError("EMPTY_EXPR")
-        return {"name": name or "", "expression": expr}
-
-    factors = []
-
-    # case 1: string
-    if isinstance(expr_field, str):
-        expr = expr_field.strip()
-        if not expr:
-            return None, ("Missing 'expression'", "EMPTY_EXPR")
-        return [{"name": "", "expression": expr}], None
-
-    # case 2: dict name -> expr
-    if isinstance(expr_field, dict):
-        if len(expr_field) == 0:
-            return None, ("Missing 'expression'", "EMPTY_EXPR")
-        for name, expr in expr_field.items():
-            if not isinstance(expr, str):
-                return None, (
-                    "Invalid 'expression' dict value (must be string)",
-                    "BAD_EXPR_FORMAT",
-                )
-            expr = expr.strip()
-            if not expr:
-                return None, (f"Empty expression for name='{name}'", "EMPTY_EXPR")
-            factors.append({"name": str(name), "expression": expr})
-        return factors, None
-
-    # case 3: list
-    if isinstance(expr_field, list):
-        if len(expr_field) == 0:
-            return None, ("Missing 'expression'", "EMPTY_EXPR")
-
-        for i, item in enumerate(expr_field):
-            # list of strings
-            if isinstance(item, str):
-                s = item.strip()
-                if not s:
-                    return None, (f"Empty expression at index {i}", "EMPTY_EXPR")
-                factors.append({"name": "", "expression": s})
-                continue
-
-            # list of dicts: {"name": "expr"} (allow one or many pairs)
-            if isinstance(item, dict):
-                if len(item) == 0:
-                    return None, (f"Empty dict at index {i}", "BAD_EXPR_FORMAT")
-                for name, expr in item.items():
-                    if not isinstance(expr, str):
-                        return None, (
-                            f"Invalid expression at index {i} (must be string)",
-                            "BAD_EXPR_FORMAT",
-                        )
-                    expr = expr.strip()
-                    if not expr:
-                        return None, (
-                            f"Empty expression for name='{name}' at index {i}",
-                            "EMPTY_EXPR",
-                        )
-                    factors.append({"name": str(name), "expression": expr})
-                continue
-
-            return None, (
-                f"Invalid item type in expression list at index {i}",
-                "BAD_EXPR_FORMAT",
-            )
-
-        return factors, None
-
-    return None, (
-        "Invalid 'expression' type (must be string, dict, or list)",
-        "BAD_EXPR_FORMAT",
     )
